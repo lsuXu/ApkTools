@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="ApkTools">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/apktool.jar!/" />
+      <root url="jar://$PROJECT_DIR$/apksigner.jar!/" />
+      <root url="jar://$PROJECT_DIR$/AndResGuard-cli-1.2.15.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
