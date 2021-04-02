@@ -1,45 +1,28 @@
 package com.company;
 
+import com.company.bean.ApkKey;
+import com.company.tools.CommonUtils;
+import com.company.tools.FileUtils;
+import com.company.tools.ThreadPool;
 import org.json.JSONObject;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.io.*;
-import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.function.Consumer;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
-import java.util.zip.ZipOutputStream;
 
 public class Main {
-    private static final int buffer = 2048;
-    public static String apkPath = "/Users/uuu/Desktop/video-flutter/build/app/outputs/apk/release/app-release.apk";
-    static int ff = 0, ss = 0;
-    private static List<String> n = new ArrayList<String>();
-    private static List<String> l = new ArrayList<String>();
+    public static String apkPath = "/Users/jz/Desktop/workspace/video-flutter/release/2021_03_29_17_14_33_release.apk";
+
     private static FrameWindow window;
     private static String ka, ksp, kp, kFilePath;
+
+    private static ApkKey key;
 
     public static void main(String[] args) {
         // write your code here
         System.setProperty("apple.awt.fileDialogForDirectories", "false");
-        for (int i = 0; i < 10; i++) {
-            n.add(i + "");
-        }
-        for (char i = 'a'; i < 'z'; i++) {
-            n.add(i + "");
-            l.add(String.valueOf(i));
-        }
-        Collections.shuffle(n);
-        Collections.shuffle(l);
+
 
         window = new FrameWindow();
         window.appendOutput(Main.class.getProtectionDomain().getCodeSource().getLocation().getPath());
@@ -60,6 +43,7 @@ public class Main {
             e.printStackTrace();
         }
     }
+
     public static class FrameWindow extends JFrame {
         JScrollPane js;
         private JTextField tfApkPath, tfKa, tfKp, tvKp1, tfKsFile, tfPackageName, tfIconPath, tfApkName;
@@ -72,6 +56,7 @@ public class Main {
             setLayout(new FlowLayout());
             tfApkPath = new JTextField();
             tfApkPath.setToolTipText("请选择文件");
+            tfApkPath.setText(apkPath);
             tfKa = new JTextField();
             tfKp = new JTextField();
             tvKp1 = new JTextField();
@@ -128,6 +113,7 @@ public class Main {
                         ksp = tfKp.getText();
                         kp = tvKp1.getText();
                         kFilePath = tfKsFile.getText();
+                        key = new ApkKey(kFilePath,ka,kp,ksp);
 
                         OutputStream os = new FileOutputStream("./config.json");
                         JSONObject jsonObject = new JSONObject();
@@ -138,15 +124,8 @@ public class Main {
                         os.write(jsonObject.toString().getBytes());
                         os.close();
                         taOut.setText("");
-                        ExecutorService service = Executors.newCachedThreadPool(new ThreadFactory() {
 
-                            @Override
-                            public Thread newThread(Runnable r) {
-                                return new Thread(r, "output");
-                            }
-                        });
-
-                        service.submit(new Runnable() {
+                        ThreadPool.getInstance().submit(new Runnable() {
                             @Override
                             public void run() {
                                 try {
@@ -163,7 +142,7 @@ public class Main {
                                     } else {
                                         savePath = "temp.apk";
                                         ApkToolManager manager = new ApkToolManager(path, savePath);
-                                        manager.setCallback(new ApkToolManager.ExecuteCallback() {
+                                        manager.setCallback(new IExecuteCallback() {
                                             @Override
                                             public void onError(InputStream errorStream) {
                                                 printMessage(errorStream);
@@ -194,14 +173,10 @@ public class Main {
                                         }
                                         //处理完成后，释放资源，将在输出目录生成apk文件
                                         success = manager.close();
-                                        System.out.println("save " + (success ? "success" : "fail"));
+                                        System.out.println("save apk file " + (success ? "success" : "fail"));
                                     }
-                                    unzip(new File(savePath), "");
-                                    //删除临时生成的apk包
-
-                                    //./app/
-//                                   Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", "cd ./app/ && find . -type f -exec bash -c 'echo -e -n \"\\x00\" >> {}' \\;"});
-                                    //find . -type f -exec bash -c 'echo -e -n "\x00" >> {}' \;
+                                    FileUtils.unzip(new File(savePath), "app");
+                                    System.out.printf("解压完成,解压路径:%s%n",new File("app").getAbsolutePath());
 
                                     FileUtils.deleteFile(savePath);
                                     rename();
@@ -268,7 +243,6 @@ public class Main {
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
                 public void run() {
-                    // TODO Auto-generated method stub
                     if (text != null) {
                         taOut.append(text + "\n");
                     }
@@ -286,60 +260,8 @@ public class Main {
         }
 
 
-        //生成一个随机的文件名
-        public String genFileName() {
-            String s = l.get(ff) + n.get(ss++);
-            if (ss >= n.size()) {
-                ss = 0;
-                ff++;
-            }
-            if (ff >= l.size())
-                ff = 0;
-            return s;
-        }
-
-        private void compress(File sourceFile, ZipOutputStream zos, String name,
-                              boolean KeepDirStructure) throws Exception {
-            byte[] buf = new byte[buffer];
-            if (sourceFile.isFile()) {
-                // 向zip输出流中添加一个zip实体，构造器中name为zip实体的文件的名字
-                zos.putNextEntry(new ZipEntry(name));
-                // copy文件到zip输出流中
-                int len;
-                FileInputStream in = new FileInputStream(sourceFile);
-                while ((len = in.read(buf)) != -1) {
-                    zos.write(buf, 0, len);
-                }
-                // Complete the entry
-                zos.closeEntry();
-                in.close();
-            } else {
-                File[] listFiles = sourceFile.listFiles();
-                if (listFiles == null || listFiles.length == 0) {
-                    // 需要保留原来的文件结构时,需要对空文件夹进行处理
-                    if (KeepDirStructure) {
-                        // 空文件夹的处理
-                        zos.putNextEntry(new ZipEntry(name + "/"));
-                        // 没有文件，不需要文件的copy
-                        zos.closeEntry();
-                    }
-                } else {
-                    for (File file : listFiles) {
-                        // 判断是否需要保留原来的文件结构
-                        if (KeepDirStructure) {
-                            // 注意：file.getName()前面需要带上父文件夹的名字加一斜杠,
-                            // 不然最后压缩包中就不能保留原来的文件结构,即：所有文件都跑到压缩包根目录下了
-                            compress(file, zos, name + "/" + file.getName(), KeepDirStructure);
-                        } else {
-                            compress(file, zos, file.getName(), KeepDirStructure);
-                        }
-                    }
-                }
-            }
-        }
-
         private void printMessage(final InputStream input) {
-            new Thread(new Runnable() {
+            ThreadPool.getInstance().execute(new Runnable() {
                 public void run() {
                     Reader reader = new InputStreamReader(input);
                     BufferedReader bf = new BufferedReader(reader);
@@ -352,64 +274,26 @@ public class Main {
                         e.printStackTrace();
                     }
                 }
-            }).start();
+            });
         }
 
-        public void toZip(String sourceFile)
+        public void toZip(String sourceFolder)
                 throws Exception {
-            //将文件夹重新压缩为zip文件
-            Process process = Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", "cd " + sourceFile + " && zip -q -r ../app.zip ./*",});
-            printMessage(process.getErrorStream());
-            printMessage(process.getInputStream());
-            int value = process.waitFor();
-            System.out.println(value);
-            if (value != 0)
-                return;
-            process.destroy();
-            //FIXME 资源混淆——Android原生 ？？
-            new File("./app.zip").renameTo(new File("./app.apk"));
-            process = Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", "java -jar AndResGuard-cli-1.2.15.jar app.apk -config config.xml -out outapk"});
-            printMessage(process.getErrorStream());
-            printMessage(process.getInputStream());
-            value = process.waitFor();
-            System.out.println(value);
 
-            if (value != 0)
-                return;
+            //将文件夹重新压缩为zip文件
+            ResourceMixManager.toZip(sourceFolder,"../app.zip",callback);
+
+            //FIXME 资源混淆——Android原生 ？？
+            ResourceMixManager.mixResource("./app.zip",callback);
 
             //FIXME 重新签名？？
-            new File("./app.apk").delete();
-            process = Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", "./zipalign -f -v 4 ./outapk/app_unsigned.apk app_aligned.apk && ./apksigner sign -verbose --ks " + kFilePath + " --v1-signing-enabled false --v2-signing-enabled true --ks-key-alias " + ka + " --ks-pass pass:" + ksp + " --key-pass pass:" + kp + "  --out ./app_aligned_signed.apk ./app_aligned.apk"});
-            printMessage(process.getInputStream());
-            printMessage(process.getErrorStream());
-            value = process.waitFor();
-            System.out.println(value);
-            if (value != 0)
-                return;
+            ResourceMixManager.signApk("./app.apk",key,callback);
+
+            ResourceMixManager.installApk("./app_aligned_signed.apk",callback);
 
             //安装APK
-            new File("./app_aligned.apk").delete();
-            deleteDirectory(new File("./app/"));
-            process = Runtime.getRuntime().exec("adb install ./app_aligned_signed.apk");
-            printMessage(process.getInputStream());
-            printMessage(process.getErrorStream());
-            value = process.waitFor();
+
             window.appendOutput("资源混淆已完成请查看" + new File("./app_aligned_signed.apk").getAbsolutePath());
-//        ZipOutputStream zos = null ;
-//        try {
-//            zos = new ZipOutputStream(out);
-//            compress(sourceFile,zos,sourceFile.getName(),KeepDirStructure);
-//        } catch (Exception e) {
-//            throw new RuntimeException("zip error from ZipUtils",e);
-//        }finally{
-//            if(zos != null){
-//                try {
-//                    zos.close();
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        }
         }
 
         public void rename() throws Exception {
@@ -418,92 +302,24 @@ public class Main {
             new File("./app/META-INF/CERT.SF").delete();
             new File("./app/META-INF/CERT.RSA").delete();
             if (jcbModify.isSelected())
-                tryModifyFlutterResources();
+                ResourceMixManager.tryModifyFlutterResources();
             //到这里，flutter_assets目录下的文件已经全部被重命名，且修改了AssetManifest的引用地址
             toZip("./app");
         }
 
-        private void tryModifyFlutterResources() throws IOException {
-            InputStream is = new FileInputStream("./app/assets/flutter_assets/AssetManifest.json");
-            int iAvail = is.available();
-            byte[] bytes = new byte[iAvail];
-            is.read(bytes);
-            is.close();
-            JSONObject jsonObject = new JSONObject(new String(bytes));
-            jsonObject.keySet().forEach(new Consumer<String>() {
-                @Override
-                public void accept(String s) {
-                    String f = jsonObject.getJSONArray(s).getString(0);
-                    String[] d = f.split("/");
-                    String name = d[d.length - 1];
-                    String nLastName = genFileName();//随机的文件名
-                    String newName = f.replaceAll(name, nLastName);
-                    new File("./app/assets/flutter_assets/" + f).renameTo(new File("./app/assets/flutter_assets/" + newName));//资源文件重命名
-                    jsonObject.getJSONArray(s).put(0, newName);//修改资源文件引用地址
-                }
-            });
-            OutputStream os = new FileOutputStream("./app/assets/flutter_assets/AssetManifest.json");
-            os.write(jsonObject.toString().getBytes());
-            os.close();
-        }
-
-        public void deleteDirectory(File file) throws Exception {
-
-            if (file.isFile()) {
-                file.delete();//清理文件
-            } else {
-                File list[] = file.listFiles();
-                if (list != null) {
-                    for (File f : list) {
-                        deleteDirectory(f);
-                    }
-                    file.delete();//清理目录
-                }
+        private IExecuteCallback callback = new IExecuteCallback() {
+            @Override
+            public void onError(InputStream errorStream) {
+                printMessage(errorStream);
             }
-        }
+
+            @Override
+            public void onInfo(InputStream infoStream) {
+                printMessage(infoStream);
+            }
+        };
 
 
-        public void unzip(File zipFile, String descDir) throws Exception {
-            try {
-
-                deleteDirectory(new File("./app/"));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            descDir = "./app/";
-            File pathFile = new File(descDir);
-            if (!pathFile.exists()) {
-                pathFile.mkdirs();
-            }
-            //解决zip文件中有中文目录或者中文文件
-            ZipFile zip = new ZipFile(zipFile, Charset.forName("GBK"));
-            for (Enumeration entries = zip.entries(); entries.hasMoreElements(); ) {
-                ZipEntry entry = (ZipEntry) entries.nextElement();
-                String zipEntryName = entry.getName();
-                InputStream in = zip.getInputStream(entry);
-                String outPath = (descDir + zipEntryName).replaceAll("\\*", "/");
-                //判断路径是否存在,不存在则创建文件路径
-                File file = new File(outPath.substring(0, outPath.lastIndexOf('/')));
-                if (!file.exists()) {
-                    file.mkdirs();
-                }
-                //判断文件全路径是否为文件夹,如果是上面已经上传,不需要解压
-                if (new File(outPath).isDirectory()) {
-                    continue;
-                }
-                //输出文件路径信息
-                window.appendOutput(outPath);
-                OutputStream out = new FileOutputStream(outPath);
-                byte[] buf1 = new byte[1024];
-                int len;
-                while ((len = in.read(buf1)) > 0) {
-                    out.write(buf1, 0, len);
-                }
-                in.close();
-                out.close();
-            }
-            window.appendOutput("******************解压完毕********************");
-        }
     }
 
 }

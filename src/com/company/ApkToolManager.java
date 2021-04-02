@@ -1,5 +1,6 @@
 package com.company;
 
+import com.company.tools.FileUtils;
 import org.json.JSONArray;
 
 import java.io.*;
@@ -17,7 +18,7 @@ public class ApkToolManager {
     //检索文件，修改报名
     private static final String MANIFEST_FILE_NAME = "AndroidManifest.xml";
     //脚本执行回调
-    private ExecuteCallback callback;
+    private IExecuteCallback callback;
     //apk源路径/apk处理完成的保存路径
     private final String sourceApkPath, targetPath;
     //apk解压后的临时存储文件夹
@@ -133,7 +134,7 @@ public class ApkToolManager {
      *
      * @param callback callback
      */
-    public void setCallback(ExecuteCallback callback) {
+    public void setCallback(IExecuteCallback callback) {
         this.callback = callback;
     }
 
@@ -299,13 +300,4 @@ public class ApkToolManager {
         }
     }
 
-    /**
-     * 脚本执行回调
-     */
-    interface ExecuteCallback {
-        void onError(InputStream errorStream);
-
-        void onInfo(InputStream infoStream);
-    }
-    
 }
