@@ -283,9 +283,10 @@ public class ApkToolManager {
         //临时保存apk反编译的路径
         Process process = Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", String.format("java -jar apktool.jar b %s -o %s", folderName, saveApkPath)});
         callbackInfo(process);
-        int value = process.waitFor();
-        System.out.println(value);
-        return true;
+        boolean success = process.waitFor() == 0;
+        //压缩完成后，删除临时文件夹
+        FileUtils.deleteFile(folderName);
+        return success;
     }
 
     /**

@@ -10,4 +10,6 @@ public interface IExecuteCallback {
     void onError(InputStream errorStream);
 
     void onInfo(InputStream infoStream);
+
+    void onMsg(String msg);
 }

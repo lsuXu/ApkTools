@@ -1,6 +1,6 @@
 package com.company.bean;
 
-public class ApkKey {
+public class SignatureKey {
 
     private String kFilePath;
 
@@ -10,7 +10,7 @@ public class ApkKey {
 
     private String ksp;
 
-    public ApkKey(String kFilePath, String ka, String kp, String ksp) {
+    public SignatureKey(String kFilePath, String ka, String kp, String ksp) {
         this.kFilePath = kFilePath;
         this.ka = ka;
         this.kp = kp;

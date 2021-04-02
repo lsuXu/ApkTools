@@ -1,6 +1,6 @@
 package com.company;
 
-import com.company.bean.ApkKey;
+import com.company.bean.SignatureKey;
 import com.company.tools.CommonUtils;
 import com.company.tools.FileUtils;
 import com.company.tools.ThreadPool;
@@ -17,7 +17,7 @@ public class Main {
     private static FrameWindow window;
     private static String ka, ksp, kp, kFilePath;
 
-    private static ApkKey key;
+    private static SignatureKey key;
 
     public static void main(String[] args) {
         // write your code here
@@ -113,7 +113,7 @@ public class Main {
                         ksp = tfKp.getText();
                         kp = tvKp1.getText();
                         kFilePath = tfKsFile.getText();
-                        key = new ApkKey(kFilePath,ka,kp,ksp);
+                        key = new SignatureKey(kFilePath,ka,kp,ksp);
 
                         OutputStream os = new FileOutputStream("./config.json");
                         JSONObject jsonObject = new JSONObject();
@@ -152,6 +152,11 @@ public class Main {
                                             public void onInfo(InputStream infoStream) {
                                                 printMessage(infoStream);
                                             }
+
+                                            @Override
+                                            public void onMsg(String msg) {
+
+                                            }
                                         });
                                         //预备解析内容，检查参数是否合规，解析清单内容
                                         boolean success = manager.prepareParsing();
@@ -175,11 +180,14 @@ public class Main {
                                         success = manager.close();
                                         System.out.println("save apk file " + (success ? "success" : "fail"));
                                     }
-                                    FileUtils.unzip(new File(savePath), "app");
-                                    System.out.printf("解压完成,解压路径:%s%n",new File("app").getAbsolutePath());
+                                    boolean needMixFlutterRes = jcbModify.isSelected();
+                                    ResourceMixManager mixManager =new ResourceMixManager(savePath,"mix_release.apk",needMixFlutterRes,key);
+                                    mixManager.setCallback(callback);
+                                    mixManager.startTask();
+
 
                                     FileUtils.deleteFile(savePath);
-                                    rename();
+                                    window.appendOutput("资源混淆已完成请查看" + new File("./app_aligned_signed.apk").getAbsolutePath());
                                 } catch (Exception exception) {
                                     window.appendOutput(exception.getLocalizedMessage());
                                 }
@@ -277,35 +285,6 @@ public class Main {
             });
         }
 
-        public void toZip(String sourceFolder)
-                throws Exception {
-
-            //将文件夹重新压缩为zip文件
-            ResourceMixManager.toZip(sourceFolder,"../app.zip",callback);
-
-            //FIXME 资源混淆——Android原生 ？？
-            ResourceMixManager.mixResource("./app.zip",callback);
-
-            //FIXME 重新签名？？
-            ResourceMixManager.signApk("./app.apk",key,callback);
-
-            ResourceMixManager.installApk("./app_aligned_signed.apk",callback);
-
-            //安装APK
-
-            window.appendOutput("资源混淆已完成请查看" + new File("./app_aligned_signed.apk").getAbsolutePath());
-        }
-
-        public void rename() throws Exception {
-            new File("./app/META-INF/MANIFEST.MF").delete();
-            //签名相关
-            new File("./app/META-INF/CERT.SF").delete();
-            new File("./app/META-INF/CERT.RSA").delete();
-            if (jcbModify.isSelected())
-                ResourceMixManager.tryModifyFlutterResources();
-            //到这里，flutter_assets目录下的文件已经全部被重命名，且修改了AssetManifest的引用地址
-            toZip("./app");
-        }
 
         private IExecuteCallback callback = new IExecuteCallback() {
             @Override
@@ -316,6 +295,11 @@ public class Main {
             @Override
             public void onInfo(InputStream infoStream) {
                 printMessage(infoStream);
+            }
+
+            @Override
+            public void onMsg(String msg) {
+
             }
         };
 
